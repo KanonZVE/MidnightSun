@@ -8,14 +8,14 @@
 
 ## PHASE 1: INFRASTRUCTURE (Week 1)
 
-### Task 1.1: VKMS Integration Foundation
+### Task 1.1: VKMS Integration Foundation ✅ COMPLETED
 **Description**: Create the HeadlessDisplay class with VKMS support
-**Files**: `src/platform/linux/headless_display.h`, `src/platform/linux/headless_display.cpp`
+**Files**: `src/platform/linux/headless.h`, `src/platform/linux/headless.cpp`
 **Acceptance Criteria**:
-- [ ] Can detect VKMS module availability
-- [ ] Can load VKMS module (`modprobe vkms`)
-- [ ] Can create virtual connector/crtc/framebuffer
-- [ ] Can provide DRM file descriptor to capture pipeline
+- [x] Can detect VKMS module availability (`is_vkms_available()`)
+- [x] Can load VKMS module (`modprobe vkms` with CAP_SYS_ADMIN)
+- [x] Can create virtual connector/crtc/framebuffer (dumb buffer + drmModeAddFB2)
+- [x] Can provide DRM file descriptor to capture pipeline (`get_drm_fd()`)
 **Estimated**: 2-3 days
 
 ### Task 1.2: Configuration Extension
@@ -28,14 +28,14 @@
 - [ ] Config loads/saves properly
 **Estimated**: 1 day
 
-### Task 1.3: Headless Detection Logic
+### Task 1.3: Headless Detection Logic ✅ COMPLETED
 **Description**: Implement detection of "no physical display" state
-**Files**: `src/platform/linux/kmsgrab.cpp`
+**Files**: `src/platform/linux/headless.cpp`, `src/platform/linux/misc.cpp`
 **Acceptance Criteria**:
-- [ ] Can scan DRM connectors for active displays
-- [ ] Returns true when no physical display connected
-- [ ] Returns false when any display is connected
-- [ ] Works with AMD GPU (amdgpu driver)
+- [x] Can scan DRM connectors for active displays (`is_headless()`)
+- [x] Returns true when no physical display connected
+- [x] Returns false when any display is connected
+- [x] Works with AMD GPU (skips VKMS cards when checking for physical displays)
 **Estimated**: 1 day
 
 ---
