@@ -66,8 +66,8 @@ jobs:
           # Clone googletest
           git clone --depth 1 https://github.com/google/googletest.git third-party/googletest
           
-          # Clone build-deps
-          git clone --depth 1 https://github.com/LizardByte/build-deps.git third-party/build-deps
+          # Clone build-deps (recursive to get nested submodules)
+          git clone --recursive https://github.com/LizardByte/build-deps.git third-party/build-deps
           
           # Clone doxyconfig
           git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
