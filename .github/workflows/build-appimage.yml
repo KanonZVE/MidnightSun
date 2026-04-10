@@ -21,6 +21,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Initialize submodules
+        run: |
+          echo "=== Initializing Submodules ==="
+          git submodule update --init --recursive --force
+          echo "=== Submodule Status ==="
+          git submodule status --recursive
 
       - name: Install dependencies
         run: |
@@ -77,6 +85,15 @@ jobs:
           echo "=== Disk Space ==="
           df -h .
 
+      - name: Verify submodules
+        run: |
+          echo "=== Third-party directories ==="
+          ls -la third-party/
+          echo "=== Moonlight-common-c contents ==="
+          ls -la third-party/moonlight-common-c/ | head -10
+          echo "=== Glad contents ==="
+          ls -la third-party/glad/ | head -10
+
       - name: Configure CMake with AppImage flag
         run: |
           cmake -B build -G Ninja \
@@ -103,18 +120,13 @@ jobs:
         run: |
           echo "=== AppDir Contents ==="
           ls -la build/AppDir/
-          echo "=== AppDir/usr Contents ==="
-          ls -la build/AppDir/usr/ 2>/dev/null || echo "usr/ not found"
           echo "=== AppDir/usr/bin Contents ==="
           ls -la build/AppDir/usr/bin/ 2>/dev/null || echo "usr/bin/ not found"
-          echo "=== AppDir/usr/share Contents ==="
-          ls -la build/AppDir/usr/share/ 2>/dev/null || echo "usr/share/ not found"
 
       - name: Copy custom AppRun
         run: |
-          cp -f packaging/AppImage/AppRun build/AppDir/
+          cp -f packaging/linux/AppImage/AppRun build/AppDir/
           chmod +x build/AppDir/AppRun
-          ls -la build/AppDir/AppRun
 
       - name: Download linuxdeploy
         run: |
@@ -133,7 +145,7 @@ jobs:
             --appdir AppDir \
             --plugin gtk \
             --executable AppDir/usr/bin/sunshine \
-            --desktop-file ../packaging/AppImage/com.midnightsun.app.desktop \
+            --desktop-file ../packaging/linux/AppImage/com.midnightsun.app.desktop \
             --output appimage
 
       - name: Rename AppImage
@@ -164,11 +176,9 @@ jobs:
         if: failure()
         run: |
           echo "=== Build Failed - Diagnostic Info ==="
+          echo "=== Submodule Status ==="
+          git submodule status --recursive
+          echo "=== Third-party directories ==="
+          ls -la third-party/
           echo "=== CMake Cache (relevant) ==="
           grep -E "SUNSHINE|CMAKE_INSTALL_PREFIX|SUNSHINE_ASSETS" build/CMakeCache.txt 2>/dev/null | head -20
-          echo "=== Build directory structure ==="
-          ls -la build/
-          echo "=== AppDir structure ==="
-          ls -laR build/AppDir/ 2>/dev/null | head -100
-          echo "=== Last 50 lines of build output ==="
-          tail -50 build/build.ninja 2>/dev/null || echo "No build.ninja"
