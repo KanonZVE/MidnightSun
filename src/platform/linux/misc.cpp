@@ -40,6 +40,7 @@
 
 // local includes
 #include "graphics.h"
+#include "headless.h"
 #include "misc.h"
 #include "src/config.h"
 #include "src/entry_handler.h"
@@ -956,6 +957,7 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_PORTAL
       PORTAL,  ///< XDG PORTAL
 #endif
+      HEADLESS,  ///< Headless virtual display (VKMS)
       MAX_FLAGS  ///< The maximum number of flags
     };
   }  // namespace source
@@ -1007,6 +1009,13 @@ namespace platf {
   }
 #endif
 
+  bool verify_headless() {
+    return platf::headless::is_headless() &&
+           platf::headless::HeadlessDisplay::is_vkms_available();
+  }
+
+  std::shared_ptr<display_t> headless_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+
   std::vector<std::string> display_names(mem_type_e hwdevice_type) {
 #ifdef SUNSHINE_BUILD_CUDA
     // display using NvFBC only supports mem_type_e::cuda
@@ -1034,6 +1043,9 @@ namespace platf {
       return portal_display_names();
     }
 #endif
+    if (sources[source::HEADLESS]) {
+      return platf::headless::headless_display_names();
+    }
     return {};
   }
 
@@ -1077,6 +1089,10 @@ namespace platf {
       return portal_display(hwdevice_type, display_name, config);
     }
 #endif
+    if (sources[source::HEADLESS]) {
+      BOOST_LOG(info) << "Screencasting with headless virtual display"sv;
+      return headless_display(hwdevice_type, display_name, config);
+    }
 
     return nullptr;
   }
@@ -1135,6 +1151,9 @@ namespace platf {
       sources[source::PORTAL] = true;
     }
 #endif
+    if ((config::video.capture.empty() || config::video.capture == "headless") && verify_headless()) {
+      sources[source::HEADLESS] = true;
+    }
 
     if (sources.none()) {
       BOOST_LOG(error) << "Unable to initialize capture method"sv;
