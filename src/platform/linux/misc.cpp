@@ -1015,19 +1015,21 @@ namespace platf {
 
 #ifdef SUNSHINE_BUILD_HEADLESS
   bool verify_headless() {
-    // Check if VKMS is available - this is the fallback capture source
-    // when no physical displays exist and KMS capture is not available
-    if (!platf::headless::HeadlessDisplay::is_vkms_available()) {
-      BOOST_LOG(debug) << "Headless source unavailable: VKMS module not available"sv;
-      return false;
-    }
-
+    // Headless is available if system is headless (no physical displays)
+    // VKMS availability is checked at runtime during display creation.
+    // If VKMS is unavailable, a software fallback produces blank frames
+    // so the streaming pipeline can still work.
     if (!platf::headless::is_headless()) {
       BOOST_LOG(debug) << "Headless source: physical displays present, headless not primary"sv;
       // Still return true - headless can work as fallback even with physical displays
     }
 
-    BOOST_LOG(info) << "Headless source available via VKMS virtual display"sv;
+    if (platf::headless::HeadlessDisplay::is_vkms_available()) {
+      BOOST_LOG(info) << "Headless source available via VKMS virtual display"sv;
+    } else {
+      BOOST_LOG(warning) << "Headless source: VKMS unavailable, will use software fallback (blank frames)"sv;
+    }
+
     return true;
   }
 

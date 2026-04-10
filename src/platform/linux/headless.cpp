@@ -138,13 +138,23 @@ namespace platf::headless {
 
     auto display = std::unique_ptr<HeadlessDisplay>(new HeadlessDisplay());
 
-    if (!display->setup_vkms(width, height, refresh_rate)) {
+    // Try VKMS first
+    if (display->setup_vkms(width, height, refresh_rate)) {
+      BOOST_LOG(info) << "Created headless virtual display via VKMS: "sv << width << "x"sv << height
+                      << "@"sv << refresh_rate << "Hz"sv;
+      return display;
+    }
+
+    // VKMS failed - fall back to software mode
+    BOOST_LOG(warning) << "VKMS unavailable, falling back to software capture mode"sv;
+
+    if (!display->setup_software(width, height, refresh_rate)) {
       BOOST_LOG(error) << "Failed to create headless display at "sv << width << "x"sv << height;
       return nullptr;
     }
 
-    BOOST_LOG(info) << "Created headless virtual display: "sv << width << "x"sv << height
-                    << "@"sv << refresh_rate << "Hz"sv;
+    BOOST_LOG(warning) << "Created headless display in SOFTWARE mode: "sv << width << "x"sv << height
+                       << "@"sv << refresh_rate << "Hz (performance may be reduced)"sv;
     return display;
   }
 
@@ -322,6 +332,18 @@ namespace platf::headless {
     return true;
   }
 
+  bool HeadlessDisplay::setup_software(int w, int h, int refresh) {
+    width_ = w;
+    height_ = h;
+    refresh_rate_ = refresh;
+    software_mode_ = true;
+    valid_ = true;
+
+    BOOST_LOG(info) << "Software fallback display initialized: "sv << w << "x"sv << h
+                    << "@"sv << refresh << "Hz (no DRM resources)"sv;
+    return true;
+  }
+
   void HeadlessDisplay::cleanup() {
     if (drm_fd_ >= 0) {
       cap_sys_admin admin;
@@ -385,6 +407,10 @@ namespace platf::headless {
     return refresh_rate_;
   }
 
+  bool HeadlessDisplay::is_software_mode() const {
+    return software_mode_;
+  }
+
   bool is_headless() {
     // Check for connected physical displays via KMS
     fs::path card_dir {"/dev/dri"sv};
@@ -445,6 +471,13 @@ namespace platf::headless {
       if (!virtual_display_ || !virtual_display_->is_valid()) {
         BOOST_LOG(error) << "Failed to create headless display"sv;
         return -1;
+      }
+
+      if (virtual_display_->is_software_mode()) {
+        BOOST_LOG(warning) << "Headless display running in SOFTWARE FALLBACK mode"sv;
+        BOOST_LOG(warning) << "  - VKMS kernel module is not available"sv;
+        BOOST_LOG(warning) << "  - Streaming will work but with reduced capture performance"sv;
+        BOOST_LOG(warning) << "  - Consider installing VKMS: modprobe vkms"sv;
       }
 
       // Set display dimensions

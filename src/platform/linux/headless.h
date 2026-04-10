@@ -91,12 +91,19 @@ public:
    */
   int get_refresh_rate() const;
 
+  /**
+   * @brief Check if this display is running in software fallback mode.
+   * @return true if VKMS is unavailable and we're using software buffers
+   */
+  bool is_software_mode() const;
+
   ~HeadlessDisplay();
 
 private:
   HeadlessDisplay() = default;
 
   bool setup_vkms(int w, int h, int refresh);
+  bool setup_software(int w, int h, int refresh);
   void cleanup();
 
   int drm_fd_ = -1;
@@ -112,6 +119,7 @@ private:
   int refresh_rate_ = 60;
 
   bool valid_ = false;
+  bool software_mode_ = false;
 };
 
 /**
