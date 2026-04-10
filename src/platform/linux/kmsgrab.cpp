@@ -20,6 +20,9 @@
 // local includes
 #include "cuda.h"
 #include "graphics.h"
+#ifdef SUNSHINE_BUILD_HEADLESS
+  #include "headless.h"
+#endif
 #include "src/config.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
@@ -611,6 +614,13 @@ namespace platf {
       int init(const std::string &display_name, const ::video::config_t &config) {
         delay = std::chrono::nanoseconds {1s} / config.framerate;
 
+#ifdef SUNSHINE_BUILD_HEADLESS
+        // Headless mode: create a VKMS virtual display and capture from it
+        if (display_name == "headless"sv) {
+          return init_headless(config);
+        }
+#endif
+
         int monitor_index = util::from_view(display_name);
         int monitor = 0;
 
@@ -815,6 +825,112 @@ namespace platf {
 
         return 0;
       }
+
+#ifdef SUNSHINE_BUILD_HEADLESS
+      /**
+       * @brief Initialize display for headless mode using VKMS virtual display.
+       * @param config Video configuration with requested resolution and framerate
+       * @return 0 on success, -1 on failure
+       */
+      int init_headless(const ::video::config_t &config) {
+        BOOST_LOG(info) << "Initializing headless virtual display at "sv
+                        << config.width << "x"sv << config.height
+                        << "@"sv << config.framerate << "Hz"sv;
+
+        // Create VKMS virtual display at the requested resolution
+        headless_display_ = headless::HeadlessDisplay::create(
+          config.width, config.height, config.framerate);
+
+        if (!headless_display_ || !headless_display_->is_valid()) {
+          BOOST_LOG(error) << "Failed to create headless virtual display"sv;
+          return -1;
+        }
+
+        // Find the VKMS card device path
+        std::string vkms_card_path;
+        for (auto &entry : fs::directory_iterator {"/dev/dri"sv}) {
+          auto file = entry.path().filename().generic_string();
+          if (file.size() < 4 || std::string_view {file}.substr(0, 4) != "card"sv) {
+            continue;
+          }
+
+          int test_fd = open(entry.path().c_str(), O_RDWR | O_CLOEXEC);
+          if (test_fd < 0) {
+            continue;
+          }
+
+          version_t ver {drmGetVersion(test_fd)};
+          if (ver && ver->name) {
+            std::string_view driver_name {ver->name, static_cast<size_t>(ver->name_len)};
+            if (driver_name == "vkms"sv) {
+              vkms_card_path = entry.path().string();
+              BOOST_LOG(info) << "Found VKMS card for headless capture: "sv << vkms_card_path;
+              close(test_fd);
+              break;
+            }
+          }
+
+          close(test_fd);
+        }
+
+        if (vkms_card_path.empty()) {
+          BOOST_LOG(error) << "No VKMS card found for headless capture"sv;
+          return -1;
+        }
+
+        // Initialize the KMS card from the VKMS device
+        if (card.init(vkms_card_path.c_str())) {
+          BOOST_LOG(error) << "Failed to initialize VKMS card for capture"sv;
+          return -1;
+        }
+
+        // Find a plane with an active framebuffer on the VKMS card
+        auto end = std::end(card);
+        for (auto plane = std::begin(card); plane != end; ++plane) {
+          if (!plane->fb_id) {
+            continue;
+          }
+
+          if (card.is_cursor(plane->plane_id)) {
+            continue;
+          }
+
+          plane_id = plane->plane_id;
+          crtc_id = plane->crtc_id;
+          crtc_index = card.get_crtc_index_by_id(plane->crtc_id);
+
+          // Use the virtual display dimensions
+          img_width = config.width;
+          img_height = config.height;
+          img_offset_x = 0;
+          img_offset_y = 0;
+
+          width = config.width;
+          height = config.height;
+          offset_x = 0;
+          offset_y = 0;
+
+          env_width = config.width;
+          env_height = config.height;
+          env_logical_width = config.width;
+          env_logical_height = config.height;
+          logical_width = config.width;
+          logical_height = config.height;
+
+          BOOST_LOG(info) << "Headless virtual display ready: "sv
+                          << img_width << "x"sv << img_height
+                          << " using plane "sv << plane_id;
+
+          // Skip cursor plane lookup for headless mode
+          cursor_plane_id = -1;
+
+          return 0;
+        }
+
+        BOOST_LOG(error) << "No suitable plane found on VKMS card"sv;
+        return -1;
+      }
+#endif  // SUNSHINE_BUILD_HEADLESS
 
       bool is_hdr() {
         if (!hdr_metadata_blob_id || *hdr_metadata_blob_id == 0) {
@@ -1153,6 +1269,11 @@ namespace platf {
       cursor_t captured_cursor {};
 
       card_t card;
+
+#ifdef SUNSHINE_BUILD_HEADLESS
+      // Headless virtual display (VKMS) - only set when in headless mode
+      std::unique_ptr<headless::HeadlessDisplay> headless_display_;
+#endif
     };
 
     class display_ram_t: public display_t {
@@ -1752,6 +1873,14 @@ namespace platf {
     BOOST_LOG(debug) << "Desktop resolution: "sv << kms::env_width << 'x' << kms::env_height;
 
     kms::card_descriptors = std::move(cds);
+
+#ifdef SUNSHINE_BUILD_HEADLESS
+    // If no physical displays were found, offer headless virtual display as fallback
+    if (display_names.empty() && headless::HeadlessDisplay::is_vkms_available()) {
+      BOOST_LOG(info) << "No physical displays found, enabling headless virtual display"sv;
+      display_names.emplace_back("headless"sv);
+    }
+#endif
 
     return display_names;
   }

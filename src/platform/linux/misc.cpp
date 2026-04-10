@@ -40,7 +40,9 @@
 
 // local includes
 #include "graphics.h"
-#include "headless.h"
+#ifdef SUNSHINE_BUILD_HEADLESS
+  #include "headless.h"
+#endif
 #include "misc.h"
 #include "src/config.h"
 #include "src/entry_handler.h"
@@ -957,7 +959,9 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_PORTAL
       PORTAL,  ///< XDG PORTAL
 #endif
+#ifdef SUNSHINE_BUILD_HEADLESS
       HEADLESS,  ///< Headless virtual display (VKMS)
+#endif
       MAX_FLAGS  ///< The maximum number of flags
     };
   }  // namespace source
@@ -1009,12 +1013,26 @@ namespace platf {
   }
 #endif
 
+#ifdef SUNSHINE_BUILD_HEADLESS
   bool verify_headless() {
-    return platf::headless::is_headless() &&
-           platf::headless::HeadlessDisplay::is_vkms_available();
+    // Check if VKMS is available - this is the fallback capture source
+    // when no physical displays exist and KMS capture is not available
+    if (!platf::headless::HeadlessDisplay::is_vkms_available()) {
+      BOOST_LOG(debug) << "Headless source unavailable: VKMS module not available"sv;
+      return false;
+    }
+
+    if (!platf::headless::is_headless()) {
+      BOOST_LOG(debug) << "Headless source: physical displays present, headless not primary"sv;
+      // Still return true - headless can work as fallback even with physical displays
+    }
+
+    BOOST_LOG(info) << "Headless source available via VKMS virtual display"sv;
+    return true;
   }
 
   std::shared_ptr<display_t> headless_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+#endif
 
   std::vector<std::string> display_names(mem_type_e hwdevice_type) {
 #ifdef SUNSHINE_BUILD_CUDA
@@ -1043,9 +1061,11 @@ namespace platf {
       return portal_display_names();
     }
 #endif
+#ifdef SUNSHINE_BUILD_HEADLESS
     if (sources[source::HEADLESS]) {
       return platf::headless::headless_display_names();
     }
+#endif
     return {};
   }
 
@@ -1089,10 +1109,13 @@ namespace platf {
       return portal_display(hwdevice_type, display_name, config);
     }
 #endif
+#ifdef SUNSHINE_BUILD_HEADLESS
     if (sources[source::HEADLESS]) {
-      BOOST_LOG(info) << "Screencasting with headless virtual display"sv;
+      BOOST_LOG(info) << "Screencasting with headless virtual display at "sv
+                      << config.width << "x"sv << config.height;
       return headless_display(hwdevice_type, display_name, config);
     }
+#endif
 
     return nullptr;
   }
@@ -1151,9 +1174,11 @@ namespace platf {
       sources[source::PORTAL] = true;
     }
 #endif
+#ifdef SUNSHINE_BUILD_HEADLESS
     if ((config::video.capture.empty() || config::video.capture == "headless") && verify_headless()) {
       sources[source::HEADLESS] = true;
     }
+#endif
 
     if (sources.none()) {
       BOOST_LOG(error) << "Unable to initialize capture method"sv;

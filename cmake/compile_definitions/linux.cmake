@@ -87,16 +87,19 @@ if(LIBDRM_FOUND)
     list(APPEND PLATFORM_LIBRARIES ${LIBDRM_LIBRARIES})
 endif()
 
-# drm
-if(${SUNSHINE_ENABLE_DRM})
-    find_package(LIBCAP REQUIRED)
-else()
+# libcap is required for headless (VKMS) and DRM capture
+find_package(LIBCAP QUIET)
+if(NOT LIBCAP_FOUND)
     set(LIBCAP_FOUND OFF)
 endif()
-if(LIBDRM_FOUND AND LIBCAP_FOUND)
-    add_compile_definitions(SUNSHINE_BUILD_DRM)
+if(LIBCAP_FOUND)
     include_directories(SYSTEM ${LIBCAP_INCLUDE_DIRS})
     list(APPEND PLATFORM_LIBRARIES ${LIBCAP_LIBRARIES})
+endif()
+
+# drm
+if(${SUNSHINE_ENABLE_DRM} AND LIBDRM_FOUND AND LIBCAP_FOUND)
+    add_compile_definitions(SUNSHINE_BUILD_DRM)
     list(APPEND PLATFORM_TARGET_FILES
             "${CMAKE_SOURCE_DIR}/src/platform/linux/kmsgrab.cpp")
     list(APPEND SUNSHINE_DEFINITIONS EGL_NO_X11=1)
@@ -331,6 +334,14 @@ list(APPEND PLATFORM_TARGET_FILES
         "${CMAKE_SOURCE_DIR}/src/platform/linux/misc.h"
         "${CMAKE_SOURCE_DIR}/src/platform/linux/misc.cpp"
         "${CMAKE_SOURCE_DIR}/src/platform/linux/audio.cpp")
+
+# headless virtual display support (requires libdrm and libcap)
+if(LIBDRM_FOUND AND LIBCAP_FOUND)
+    add_compile_definitions(SUNSHINE_BUILD_HEADLESS)
+    list(APPEND PLATFORM_TARGET_FILES
+            "${CMAKE_SOURCE_DIR}/src/platform/linux/headless.h"
+            "${CMAKE_SOURCE_DIR}/src/platform/linux/headless.cpp")
+endif()
 
 list(APPEND PLATFORM_LIBRARIES
         dl
