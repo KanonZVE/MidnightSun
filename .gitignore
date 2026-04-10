@@ -1,0 +1,30 @@
+# MidnightSun - Git Ignore
+
+# Build directories
+build/
+cmake-build-*/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Skill registry (auto-generated)
+.atl/
+
+# Credentials (sensitive)
+credentials/
+
+# State files
+sunshine_state.json
+sunshine_state.json.backup
+
+# Temporary files
+*.tmp
+*.log
