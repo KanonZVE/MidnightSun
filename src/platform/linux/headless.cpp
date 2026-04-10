@@ -69,6 +69,7 @@ namespace platf::headless {
    */
   static bool load_vkms_module() {
     if (is_vkms_loaded()) {
+      BOOST_LOG(debug) << "VKMS module already loaded"sv;
       return true;
     }
 
@@ -77,14 +78,20 @@ namespace platf::headless {
     cap_sys_admin admin;
     int ret = system("modprobe vkms 2>/dev/null"sv.data());
     if (ret != 0) {
-      BOOST_LOG(warning) << "Failed to load VKMS module via modprobe"sv;
+      BOOST_LOG(error) << "Failed to load VKMS module. Root or CAP_SYS_ADMIN required."sv;
       return false;
     }
 
     // Wait a moment for the module to initialize
     usleep(100000);
 
-    return is_vkms_loaded();
+    if (!is_vkms_loaded()) {
+      BOOST_LOG(error) << "VKMS module load returned success but module not present in /sys/module/vkms"sv;
+      return false;
+    }
+
+    BOOST_LOG(info) << "VKMS kernel module loaded successfully"sv;
+    return true;
   }
 
   /**
@@ -111,7 +118,7 @@ namespace platf::headless {
       if (ver && ver->name) {
         std::string_view driver_name {ver->name, static_cast<size_t>(ver->name_len)};
         if (driver_name == "vkms"sv) {
-          BOOST_LOG(info) << "Found VKMS card at: "sv << entry.path();
+          BOOST_LOG(info) << "Found VKMS card at: "sv << entry.path().string();
           close(fd);
           return entry.path().string();
         }
@@ -136,39 +143,43 @@ namespace platf::headless {
   std::unique_ptr<HeadlessDisplay> HeadlessDisplay::create(
     int width, int height, int refresh_rate) {
 
+    BOOST_LOG(info) << "Creating headless virtual display at "sv << width << "x"sv << height
+                    << "@"sv << refresh_rate << "Hz"sv;
+
     auto display = std::unique_ptr<HeadlessDisplay>(new HeadlessDisplay());
 
     // Try VKMS first
     if (display->setup_vkms(width, height, refresh_rate)) {
-      BOOST_LOG(info) << "Created headless virtual display via VKMS: "sv << width << "x"sv << height
+      BOOST_LOG(info) << "Headless mode activated via VKMS at "sv << width << "x"sv << height
                       << "@"sv << refresh_rate << "Hz"sv;
       return display;
     }
 
     // VKMS failed - fall back to software mode
-    BOOST_LOG(warning) << "VKMS unavailable, falling back to software capture mode"sv;
+    BOOST_LOG(warning) << "VKMS unavailable. Using software capture (reduced performance)."sv;
 
     if (!display->setup_software(width, height, refresh_rate)) {
-      BOOST_LOG(error) << "Failed to create headless display at "sv << width << "x"sv << height;
+      BOOST_LOG(error) << "Failed to create headless display at "sv << width << "x"sv << height
+                       << ". Both VKMS and software fallback failed."sv;
       return nullptr;
     }
 
-    BOOST_LOG(warning) << "Created headless display in SOFTWARE mode: "sv << width << "x"sv << height
-                       << "@"sv << refresh_rate << "Hz (performance may be reduced)"sv;
+    BOOST_LOG(warning) << "Headless mode activated via software fallback at "sv << width << "x"sv << height
+                       << "@"sv << refresh_rate << "Hz"sv;
     return display;
   }
 
   bool HeadlessDisplay::setup_vkms(int w, int h, int refresh) {
     // Ensure VKMS is available
     if (!is_vkms_available()) {
-      BOOST_LOG(error) << "VKMS module not available"sv;
+      BOOST_LOG(error) << "VKMS module not available. Install kernel module or use software fallback."sv;
       return false;
     }
 
     // Find VKMS card
     auto card_path = find_vkms_card();
     if (card_path.empty()) {
-      BOOST_LOG(error) << "No VKMS card found"sv;
+      BOOST_LOG(error) << "Failed to create VKMS virtual display. No VKMS card found after module load."sv;
       return false;
     }
 
@@ -177,27 +188,35 @@ namespace platf::headless {
     // Open the VKMS card
     drm_fd_ = open(card_path.c_str(), O_RDWR | O_CLOEXEC);
     if (drm_fd_ < 0) {
-      BOOST_LOG(error) << "Failed to open VKMS card: "sv << strerror(errno);
+      if (errno == EACCES || errno == EPERM) {
+        BOOST_LOG(error) << "Permission denied accessing DRM device "sv << card_path
+                         << ". Check CAP_SYS_ADMIN or run as root."sv;
+      } else {
+        BOOST_LOG(error) << "Failed to open VKMS card "sv << card_path << ": "sv << strerror(errno);
+      }
       return false;
     }
 
     // Enable universal planes for access to all plane types
     if (drmSetClientCap(drm_fd_, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) {
-      BOOST_LOG(warning) << "Failed to enable universal planes capability"sv;
+      BOOST_LOG(warning) << "Failed to enable universal planes capability on VKMS card"sv;
     }
 
     // Enable atomic mode-setting if available
     if (drmSetClientCap(drm_fd_, DRM_CLIENT_CAP_ATOMIC, 1)) {
-      BOOST_LOG(debug) << "Atomic mode-setting not available, using legacy API"sv;
+      BOOST_LOG(debug) << "Atomic mode-setting not available on VKMS, using legacy API"sv;
     }
 
     // Get DRM resources
     auto resources = util::safe_ptr<drmModeRes, drmModeFreeResources>(drmModeGetResources(drm_fd_));
     if (!resources) {
-      BOOST_LOG(error) << "Failed to get DRM resources: "sv << strerror(errno);
+      BOOST_LOG(error) << "Failed to get DRM resources from VKMS card: "sv << strerror(errno);
       cleanup();
       return false;
     }
+
+    BOOST_LOG(debug) << "VKMS card has "sv << resources->count_connectors << " connectors, "
+                     << resources->count_crtcs << " CRTCs"sv;
 
     // Find a suitable connector (preferably disconnected for virtual use)
     uint32_t conn_id = 0;
@@ -212,7 +231,7 @@ namespace platf::headless {
     }
 
     if (!conn_id) {
-      BOOST_LOG(error) << "No suitable connector found on VKMS card"sv;
+      BOOST_LOG(error) << "No suitable connector found on VKMS card. VKMS may be misconfigured."sv;
       cleanup();
       return false;
     }
@@ -241,7 +260,7 @@ namespace platf::headless {
     }
 
     if (!crtc_id_) {
-      BOOST_LOG(error) << "No suitable CRTC found"sv;
+      BOOST_LOG(error) << "No suitable CRTC found on VKMS card. Cannot configure virtual display."sv;
       cleanup();
       return false;
     }
@@ -253,7 +272,8 @@ namespace platf::headless {
     create_dumb.bpp = 32;  // ARGB8888
 
     if (drmIoctl(drm_fd_, DRM_IOCTL_MODE_CREATE_DUMB, &create_dumb) < 0) {
-      BOOST_LOG(error) << "Failed to create dumb buffer: "sv << strerror(errno);
+      BOOST_LOG(error) << "Failed to create dumb buffer for "sv << w << "x"sv << h
+                       << ": "sv << strerror(errno);
       cleanup();
       return false;
     }
@@ -270,10 +290,12 @@ namespace platf::headless {
       // Fall back to legacy AddFB
       if (drmModeAddFB(drm_fd_, w, h, 24, 32, create_dumb.pitch,
                        gem_handle_, &framebuffer_id_) < 0) {
-        BOOST_LOG(error) << "Failed to create framebuffer: "sv << strerror(errno);
+        BOOST_LOG(error) << "Failed to create framebuffer for "sv << w << "x"sv << h
+                         << ": "sv << strerror(errno);
         cleanup();
         return false;
       }
+      BOOST_LOG(debug) << "Using legacy framebuffer API (drmModeAddFB)"sv;
     }
 
     // Find a primary plane
@@ -302,6 +324,10 @@ namespace platf::headless {
       }
     }
 
+    if (!plane_id_) {
+      BOOST_LOG(warning) << "No primary plane found for VKMS CRTC. Virtual display may not render correctly."sv;
+    }
+
     // Set the mode
     drmModeModeInfo mode = {};
     mode.clock = (w * h * refresh) / 1000;
@@ -319,7 +345,8 @@ namespace platf::headless {
 
     if (drmModeSetCrtc(drm_fd_, crtc_id_, framebuffer_id_, 0, 0,
                        &connector_id_, 1, &mode) < 0) {
-      BOOST_LOG(error) << "Failed to set CRTC mode: "sv << strerror(errno);
+      BOOST_LOG(error) << "Failed to set CRTC mode "sv << w << "x"sv << h << "@"sv << refresh
+                       << "Hz: "sv << strerror(errno);
       cleanup();
       return false;
     }
@@ -329,6 +356,9 @@ namespace platf::headless {
     refresh_rate_ = refresh;
     valid_ = true;
 
+    BOOST_LOG(debug) << "VKMS virtual display configured: CRTC="sv << crtc_id_
+                     << " connector="sv << connector_id_
+                     << " plane="sv << plane_id_;
     return true;
   }
 
@@ -339,8 +369,8 @@ namespace platf::headless {
     software_mode_ = true;
     valid_ = true;
 
-    BOOST_LOG(info) << "Software fallback display initialized: "sv << w << "x"sv << h
-                    << "@"sv << refresh << "Hz (no DRM resources)"sv;
+    BOOST_LOG(info) << "Software fallback display initialized at "sv << w << "x"sv << h
+                    << "@"sv << refresh << "Hz (no DRM resources, blank frames)"sv;
     return true;
   }
 
@@ -362,12 +392,16 @@ namespace platf::headless {
 
       close(drm_fd_);
       drm_fd_ = -1;
+      BOOST_LOG(debug) << "VKMS resources cleaned up"sv;
     }
 
     valid_ = false;
   }
 
   HeadlessDisplay::~HeadlessDisplay() {
+    if (valid_) {
+      BOOST_LOG(debug) << "Headless mode deactivated"sv;
+    }
     cleanup();
   }
 
@@ -414,6 +448,12 @@ namespace platf::headless {
   bool is_headless() {
     // Check for connected physical displays via KMS
     fs::path card_dir {"/dev/dri"sv};
+    int cards_checked = 0;
+
+    if (!fs::exists(card_dir)) {
+      BOOST_LOG(warning) << "/dev/dri not found. No DRM subsystem available."sv;
+      return true;
+    }
 
     for (auto &entry : fs::directory_iterator {card_dir}) {
       auto file = entry.path().filename().generic_string();
@@ -423,14 +463,18 @@ namespace platf::headless {
 
       int fd = open(entry.path().c_str(), O_RDWR | O_CLOEXEC);
       if (fd < 0) {
+        BOOST_LOG(debug) << "Cannot open "sv << entry.path() << ": "sv << strerror(errno);
         continue;
       }
+
+      cards_checked++;
 
       // Skip VKMS cards when checking for physical displays
       util::safe_ptr<drmVersion, drmFreeVersion> ver {drmGetVersion(fd)};
       if (ver && ver->name) {
         std::string_view driver_name {ver->name, static_cast<size_t>(ver->name_len)};
         if (driver_name == "vkms"sv) {
+          BOOST_LOG(debug) << "Skipping VKMS card "sv << entry.path() << " for physical display detection"sv;
           close(fd);
           continue;
         }
@@ -442,6 +486,8 @@ namespace platf::headless {
           auto conn = util::safe_ptr<drmModeConnector, drmModeFreeConnector>(
             drmModeGetConnector(fd, resources->connectors[i]));
           if (conn && conn->connection == DRM_MODE_CONNECTED) {
+            BOOST_LOG(info) << "Physical display detected on "sv << entry.path()
+                            << ". Using standard capture mode."sv;
             close(fd);
             return false;  // Found a connected physical display
           }
@@ -451,6 +497,11 @@ namespace platf::headless {
       close(fd);
     }
 
+    if (cards_checked == 0) {
+      BOOST_LOG(warning) << "No DRM devices found in /dev/dri. Is a GPU present?"sv;
+    }
+
+    BOOST_LOG(info) << "No physical displays detected. Activating headless mode."sv;
     return true;  // No connected physical displays found
   }
 
@@ -469,7 +520,8 @@ namespace platf::headless {
       // Create a virtual display at the requested resolution
       virtual_display_ = HeadlessDisplay::create(config.width, config.height, config.framerate);
       if (!virtual_display_ || !virtual_display_->is_valid()) {
-        BOOST_LOG(error) << "Failed to create headless display"sv;
+        BOOST_LOG(error) << "Failed to create headless display at "sv << config.width << "x"sv << config.height
+                         << ". Both VKMS and software fallback are unavailable."sv;
         return -1;
       }
 
@@ -478,6 +530,8 @@ namespace platf::headless {
         BOOST_LOG(warning) << "  - VKMS kernel module is not available"sv;
         BOOST_LOG(warning) << "  - Streaming will work but with reduced capture performance"sv;
         BOOST_LOG(warning) << "  - Consider installing VKMS: modprobe vkms"sv;
+      } else {
+        BOOST_LOG(info) << "Headless display using VKMS (hardware virtual display)"sv;
       }
 
       // Set display dimensions
@@ -560,9 +614,12 @@ namespace platf::headless {
 namespace platf {
 
   std::shared_ptr<display_t> headless_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+    BOOST_LOG(info) << "Creating headless display wrapper for "sv << display_name;
+
     auto disp = std::make_shared<headless::headless_display_t>();
 
     if (disp->init(display_name, config)) {
+      BOOST_LOG(error) << "Failed to initialize headless display wrapper"sv;
       return nullptr;
     }
 

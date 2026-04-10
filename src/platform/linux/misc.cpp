@@ -1015,19 +1015,21 @@ namespace platf {
 
 #ifdef SUNSHINE_BUILD_HEADLESS
   bool verify_headless() {
-    // Headless is available if system is headless (no physical displays)
-    // VKMS availability is checked at runtime during display creation.
-    // If VKMS is unavailable, a software fallback produces blank frames
-    // so the streaming pipeline can still work.
-    if (!platf::headless::is_headless()) {
-      BOOST_LOG(debug) << "Headless source: physical displays present, headless not primary"sv;
-      // Still return true - headless can work as fallback even with physical displays
-    }
+    bool is_physical_headless = platf::headless::is_headless();
 
     if (platf::headless::HeadlessDisplay::is_vkms_available()) {
-      BOOST_LOG(info) << "Headless source available via VKMS virtual display"sv;
+      if (is_physical_headless) {
+        BOOST_LOG(info) << "Headless source available: no physical displays, VKMS virtual display ready"sv;
+      } else {
+        BOOST_LOG(info) << "Headless source available via VKMS virtual display (physical displays also present)"sv;
+      }
     } else {
-      BOOST_LOG(warning) << "Headless source: VKMS unavailable, will use software fallback (blank frames)"sv;
+      if (is_physical_headless) {
+        BOOST_LOG(warning) << "Headless source: VKMS unavailable, will use software fallback (reduced performance)"sv;
+      } else {
+        BOOST_LOG(warning) << "Headless source: VKMS unavailable and physical displays present. "
+                           << "Software fallback will produce blank frames."sv;
+      }
     }
 
     return true;
@@ -1114,7 +1116,8 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_HEADLESS
     if (sources[source::HEADLESS]) {
       BOOST_LOG(info) << "Screencasting with headless virtual display at "sv
-                      << config.width << "x"sv << config.height;
+                      << config.width << "x"sv << config.height
+                      << "@"sv << config.framerate << "Hz"sv;
       return headless_display(hwdevice_type, display_name, config);
     }
 #endif
