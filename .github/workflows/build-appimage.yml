@@ -17,18 +17,31 @@ jobs:
     runs-on: ubuntu-22.04
     
     steps:
-      - name: Checkout code
+      - name: Checkout code with submodules
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Initialize submodules
+      - name: Initialize all submodules
         run: |
-          echo "=== Initializing Submodules ==="
-          git submodule update --init --recursive --force
-          echo "=== Submodule Status ==="
+          echo "=== Configuring git for submodules ==="
+          git config --global submodule.recurse true
+          git config --global protocol.version 2
+          
+          echo "=== Initializing submodules ==="
+          git submodule sync --recursive
+          git submodule update --init --recursive --force --checkout
+          
+          echo "=== Submodule status ==="
           git submodule status --recursive
+          
+          echo "=== Checking third-party directories ==="
+          ls -la third-party/
+          echo "=== Checking glad directory ==="
+          ls -la third-party/glad/ 2>/dev/null || echo "glad directory empty or missing"
+          echo "=== Checking moonlight-common-c directory ==="
+          ls -la third-party/moonlight-common-c/ 2>/dev/null || echo "moonlight-common-c directory empty or missing"
 
       - name: Install dependencies
         run: |
@@ -82,17 +95,6 @@ jobs:
           ninja --version
           echo "=== GCC Version ==="
           gcc --version | head -1
-          echo "=== Disk Space ==="
-          df -h .
-
-      - name: Verify submodules
-        run: |
-          echo "=== Third-party directories ==="
-          ls -la third-party/
-          echo "=== Moonlight-common-c contents ==="
-          ls -la third-party/moonlight-common-c/ | head -10
-          echo "=== Glad contents ==="
-          ls -la third-party/glad/ | head -10
 
       - name: Configure CMake with AppImage flag
         run: |
@@ -115,13 +117,6 @@ jobs:
           cd build
           mkdir -p AppDir
           DESTDIR=$(pwd)/AppDir ninja install
-
-      - name: Verify AppDir structure
-        run: |
-          echo "=== AppDir Contents ==="
-          ls -la build/AppDir/
-          echo "=== AppDir/usr/bin Contents ==="
-          ls -la build/AppDir/usr/bin/ 2>/dev/null || echo "usr/bin/ not found"
 
       - name: Copy custom AppRun
         run: |
@@ -176,9 +171,13 @@ jobs:
         if: failure()
         run: |
           echo "=== Build Failed - Diagnostic Info ==="
-          echo "=== Submodule Status ==="
-          git submodule status --recursive
+          echo "=== Git Submodule Status ==="
+          git submodule status --recursive 2>&1
+          echo "=== Git Remote -v ==="
+          git remote -v
+          echo "=== .gitmodules content ==="
+          cat .gitmodules 2>/dev/null || echo ".gitmodules not found"
           echo "=== Third-party directories ==="
-          ls -la third-party/
-          echo "=== CMake Cache (relevant) ==="
-          grep -E "SUNSHINE|CMAKE_INSTALL_PREFIX|SUNSHINE_ASSETS" build/CMakeCache.txt 2>/dev/null | head -20
+          ls -la third-party/ 2>/dev/null || echo "third-party not found"
+          echo "=== CMake Error Log ==="
+          cat build/CMakeFiles/CMakeOutput.log 2>/dev/null | tail -50 || echo "No CMakeOutput.log"
