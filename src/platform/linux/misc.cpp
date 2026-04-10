@@ -1016,6 +1016,17 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_HEADLESS
   bool verify_headless() {
     bool is_physical_headless = platf::headless::is_headless();
+    bool gamescope_detected = platf::headless::is_gamescope_active();
+
+    if (gamescope_detected) {
+      BOOST_LOG(info) << "Gamescope compositor environment detected"sv;
+      if (is_physical_headless) {
+        BOOST_LOG(info) << "Headless source available: Gamescope virtual output will be used (VKMS skipped)"sv;
+      } else {
+        BOOST_LOG(info) << "Headless source available with Gamescope: physical displays also present"sv;
+      }
+      return true;
+    }
 
     if (platf::headless::HeadlessDisplay::is_vkms_available()) {
       if (is_physical_headless) {

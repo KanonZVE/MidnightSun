@@ -129,6 +129,12 @@ private:
 bool is_headless();
 
 /**
+ * @brief Check if Gamescope compositor is active.
+ * @return true if Gamescope environment is detected
+ */
+bool is_gamescope_active();
+
+/**
  * @brief Get display names for headless virtual displays.
  * @return Vector containing virtual display identifier
  */

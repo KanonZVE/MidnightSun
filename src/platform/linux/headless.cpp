@@ -56,6 +56,46 @@ namespace platf::headless {
   };
 
   /**
+   * @brief Check if Gamescope compositor is active.
+   * @details Gamescope sets specific environment variables and creates its own
+   *          virtual output. We detect it to avoid VKMS conflicts.
+   * @return true if Gamescope environment is detected
+   */
+  bool is_gamescope_active() {
+    // Check Gamescope-specific environment variables
+    if (getenv("GAMESCOPE_WIDTH") || getenv("GAMESCOPE_MODELIST") ||
+        getenv("GAMESCOPE_REFRESH") || getenv("GAMESCOPE_HEIGHT")) {
+      BOOST_LOG(info) << "Gamescope detected via environment variables"sv;
+      return true;
+    }
+
+    // Check for Gamescope Wayland socket
+    const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
+    if (runtime_dir) {
+      fs::path gamescope_socket {std::string(runtime_dir) + "/gamescope-0.sock"};
+      if (fs::exists(gamescope_socket)) {
+        BOOST_LOG(info) << "Gamescope detected via socket: "sv << gamescope_socket.string();
+        return true;
+      }
+    }
+
+    // Check for Gamescope compositor process
+    if (fs::exists("/proc/self/environ")) {
+      std::ifstream environ_file("/proc/self/environ");
+      if (environ_file.good()) {
+        std::string environ_content((std::istreambuf_iterator<char>(environ_file)),
+                                     std::istreambuf_iterator<char>());
+        if (environ_content.find("gamescope") != std::string::npos) {
+          BOOST_LOG(info) << "Gamescope detected via process environment"sv;
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * @brief Check if VKMS module is loaded.
    * @return true if VKMS module is present in /sys/module
    */
@@ -145,6 +185,23 @@ namespace platf::headless {
 
     BOOST_LOG(info) << "Creating headless virtual display at "sv << width << "x"sv << height
                     << "@"sv << refresh_rate << "Hz"sv;
+
+    // Check if Gamescope is active - if so, skip VKMS to avoid conflicts
+    // Gamescope creates its own virtual output that should not be interfered with
+    if (is_gamescope_active()) {
+      BOOST_LOG(info) << "Gamescope compositor detected. Using Gamescope's existing virtual output."sv;
+      BOOST_LOG(info) << "VKMS virtual display creation skipped to avoid conflicts with Gamescope."sv;
+
+      auto display = std::unique_ptr<HeadlessDisplay>(new HeadlessDisplay());
+      if (!display->setup_software(width, height, refresh_rate)) {
+        BOOST_LOG(error) << "Failed to initialize software fallback for Gamescope environment."sv;
+        return nullptr;
+      }
+
+      BOOST_LOG(info) << "Headless mode activated via software fallback (Gamescope environment) at "sv
+                      << width << "x"sv << height << "@"sv << refresh_rate << "Hz"sv;
+      return display;
+    }
 
     auto display = std::unique_ptr<HeadlessDisplay>(new HeadlessDisplay());
 
@@ -446,6 +503,13 @@ namespace platf::headless {
   }
 
   bool is_headless() {
+    // If Gamescope is active, it provides its own virtual output
+    // so we're not truly "headless" - Gamescope handles the display
+    if (is_gamescope_active()) {
+      BOOST_LOG(info) << "Gamescope active - virtual output provided by compositor"sv;
+      return false;
+    }
+
     // Check for connected physical displays via KMS
     fs::path card_dir {"/dev/dri"sv};
     int cards_checked = 0;
