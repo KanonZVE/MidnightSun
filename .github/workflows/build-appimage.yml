@@ -17,31 +17,67 @@ jobs:
     runs-on: ubuntu-22.04
     
     steps:
-      - name: Checkout code with submodules
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Initialize all submodules
+      - name: Manually clone required submodules
         run: |
-          echo "=== Configuring git for submodules ==="
-          git config --global submodule.recurse true
-          git config --global protocol.version 2
+          echo "=== Cloning required submodules manually ==="
           
-          echo "=== Initializing submodules ==="
-          git submodule sync --recursive
-          git submodule update --init --recursive --force --checkout
+          # Remove empty directories if they exist
+          rm -rf third-party/glad
+          rm -rf third-party/moonlight-common-c
+          rm -rf third-party/Simple-Web-Server
+          rm -rf third-party/libdisplaydevice
+          rm -rf third-party/nanors
+          rm -rf third-party/nv-codec-headers
+          rm -rf third-party/nvapi
+          rm -rf third-party/inputtino
+          rm -rf third-party/googletest
+          rm -rf third-party/build-deps
+          rm -rf third-party/doxyconfig
           
-          echo "=== Submodule status ==="
-          git submodule status --recursive
+          # Clone glad
+          git clone --depth 1 https://github.com/Dav1dde/glad.git third-party/glad
           
-          echo "=== Checking third-party directories ==="
+          # Clone moonlight-common-c
+          git clone --depth 1 https://github.com/moonlight-stream/moonlight-common-c.git third-party/moonlight-common-c
+          
+          # Clone Simple-Web-Server
+          git clone --depth 1 https://github.com/LizardByte-infrastructure/Simple-Web-Server.git third-party/Simple-Web-Server
+          
+          # Clone libdisplaydevice
+          git clone --depth 1 https://github.com/LizardByte/libdisplaydevice.git third-party/libdisplaydevice
+          
+          # Clone nanors
+          git clone --depth 1 https://github.com/sleepybishop/nanors.git third-party/nanors
+          
+          # Clone nv-codec-headers
+          git clone --depth 1 -b sdk/12.0 https://github.com/FFmpeg/nv-codec-headers.git third-party/nv-codec-headers
+          
+          # Clone nvapi
+          git clone --depth 1 https://github.com/NVIDIA/nvapi.git third-party/nvapi
+          
+          # Clone inputtino
+          git clone --depth 1 -b stable https://github.com/games-on-whales/inputtino.git third-party/inputtino
+          
+          # Clone googletest
+          git clone --depth 1 https://github.com/google/googletest.git third-party/googletest
+          
+          # Clone build-deps
+          git clone --depth 1 https://github.com/LizardByte/build-deps.git third-party/build-deps
+          
+          # Clone doxyconfig
+          git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
+          
+          echo "=== Verifying cloned directories ==="
           ls -la third-party/
-          echo "=== Checking glad directory ==="
-          ls -la third-party/glad/ 2>/dev/null || echo "glad directory empty or missing"
-          echo "=== Checking moonlight-common-c directory ==="
-          ls -la third-party/moonlight-common-c/ 2>/dev/null || echo "moonlight-common-c directory empty or missing"
+          echo "=== Checking glad/cmake ==="
+          ls -la third-party/glad/cmake/ 2>/dev/null || echo "glad/cmake not found"
+          echo "=== Checking moonlight-common-c/enet ==="
+          ls -la third-party/moonlight-common-c/enet/ 2>/dev/null || echo "moonlight-common-c/enet not found"
 
       - name: Install dependencies
         run: |
@@ -171,13 +207,9 @@ jobs:
         if: failure()
         run: |
           echo "=== Build Failed - Diagnostic Info ==="
-          echo "=== Git Submodule Status ==="
-          git submodule status --recursive 2>&1
-          echo "=== Git Remote -v ==="
-          git remote -v
-          echo "=== .gitmodules content ==="
-          cat .gitmodules 2>/dev/null || echo ".gitmodules not found"
           echo "=== Third-party directories ==="
-          ls -la third-party/ 2>/dev/null || echo "third-party not found"
+          ls -la third-party/ 2>/dev/null
+          echo "=== Glad directory contents ==="
+          ls -la third-party/glad/ 2>/dev/null || echo "glad not found"
           echo "=== CMake Error Log ==="
           cat build/CMakeFiles/CMakeOutput.log 2>/dev/null | tail -50 || echo "No CMakeOutput.log"
