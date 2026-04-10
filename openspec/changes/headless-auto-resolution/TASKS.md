@@ -91,14 +91,19 @@
 - Software mode produces blank frames via existing capture()
 **Estimated**: 2 days
 
-### Task 3.2: Error Handling & Logging
+### Task 3.2: Error Handling & Logging ✅ COMPLETED
 **Description**: Robust error handling for all failure modes
-**Files**: `src/platform/linux/headless_display.cpp`, `src/platform/linux/kmsgrab.cpp`
+**Files**: `src/platform/linux/headless.cpp`, `src/platform/linux/kmsgrab.cpp`, `src/platform/linux/misc.cpp`
 **Acceptance Criteria**:
-- [ ] Clear error messages for VKMS failure
-- [ ] Graceful degradation for partial failures
-- [ ] Logs show headless mode activation/deactivation
-- [ ] No crashes on any error path
+- [x] Clear error messages for VKMS failure
+- [x] Graceful degradation for partial failures
+- [x] Logs show headless mode activation/deactivation
+- [x] No crashes on any error path
+**Implementation**:
+- Added actionable error messages with remediation steps
+- Status logging for headless mode activation/deactivation
+- Enhanced verify_headless() with 4-state logging
+- Graceful degradation: VKMS → software → nullptr
 **Estimated**: 1 day
 
 ### Task 3.3: Gamescope Compatibility
