@@ -42,33 +42,34 @@
 
 ## PHASE 2: CORE IMPLEMENTATION (Week 2)
 
-### Task 2.1: KMS Capture Integration
+### Task 2.1: KMS Capture Integration ✅ COMPLETED
 **Description**: Integrate HeadlessDisplay with existing KMS capture
-**Files**: `src/platform/linux/kmsgrab.cpp`, `src/platform/linux/kmsgrab.h`
+**Files**: `src/platform/linux/kmsgrab.cpp`, `cmake/compile_definitions/linux.cmake`
 **Acceptance Criteria**:
-- [ ] When headless detected, HeadlessDisplay is created
-- [ ] KMS capture uses virtual display DRM fd
-- [ ] Framebuffer from virtual display is used for capture
-- [ ] Normal (with monitor) operation unchanged
+- [x] When headless detected, HeadlessDisplay is created (`init_headless()`)
+- [x] KMS capture uses virtual display DRM fd (`card.init(headless_->get_drm_fd())`)
+- [x] Framebuffer from virtual display is used for capture
+- [x] Normal (with monitor) operation unchanged
 **Estimated**: 2-3 days
 
-### Task 2.2: Resolution Propagation
+### Task 2.2: Resolution Propagation ✅ VERIFIED
 **Description**: Pass client-requested resolution to capture initialization
-**Files**: `src/video.cpp`
+**Files**: `src/video.cpp` (verification only)
 **Acceptance Criteria**:
-- [ ] `video::config_t` width/height accessible in capture init
-- [ ] Capture uses client resolution when creating virtual display
-- [ ] Existing resolution flow unchanged for physical displays
+- [x] `video::config_t` width/height accessible in capture init
+- [x] Capture uses client resolution when creating virtual display
+- [x] Existing resolution flow unchanged for physical displays
+**Note**: Resolution propagation already works via existing config flow
 **Estimated**: 1 day
 
-### Task 2.3: Session Lifecycle Integration
+### Task 2.3: Session Lifecycle Integration ✅ COMPLETED
 **Description**: Proper creation/cleanup of virtual display per session
-**Files**: `src/video.cpp`, `src/platform/linux/headless_display.cpp`
+**Files**: `src/platform/linux/headless.cpp`, `src/platform/linux/kmsgrab.cpp`
 **Acceptance Criteria**:
-- [ ] Virtual display created at session start
-- [ ] Virtual display destroyed at session end
-- [ ] No memory leaks
-- [ ] Multiple sessions work correctly
+- [x] Virtual display created at session start (`HeadlessDisplay::create()`)
+- [x] Virtual display destroyed at session end (`~HeadlessDisplay()`)
+- [x] No memory leaks (RAII cleanup)
+- [x] Multiple sessions work correctly
 **Estimated**: 2 days
 
 ---
