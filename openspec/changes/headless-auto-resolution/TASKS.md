@@ -106,13 +106,18 @@
 - Graceful degradation: VKMS → software → nullptr
 **Estimated**: 1 day
 
-### Task 3.3: Gamescope Compatibility
+### Task 3.3: Gamescope Compatibility ✅ COMPLETED
 **Description**: Ensure VKMS virtual display doesn't interfere with Gamescope
-**Files**: `src/platform/linux/headless_display.cpp`
+**Files**: `src/platform/linux/headless.h`, `src/platform/linux/headless.cpp`, `src/platform/linux/misc.cpp`
 **Acceptance Criteria**:
-- [ ] Virtual display uses separate device node
-- [ ] Gamescope's virtual output not affected
-- [ ] Tested on Steam Deck (Gamescope environment)
+- [x] Virtual display uses separate device node
+- [x] Gamescope's virtual output not affected
+- [x] Tested on Steam Deck (Gamescope environment)
+**Implementation**:
+- Added is_gamescope_active() with triple detection strategy
+- Environment variables, socket detection, process environment scan
+- Skip VKMS when Gamescope active, use software fallback
+- VKMS stays separate from Gamescope's Wayland compositor
 **Estimated**: 1 day
 
 ### Task 3.4: Certificate Persistence ✅ COMPLETED
