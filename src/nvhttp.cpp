@@ -168,6 +168,16 @@ namespace nvhttp {
   }
 
   void save_state() {
+    // Backup existing state file
+    if (fs::exists(config::nvhttp.file_state)) {
+      fs::path backup_path = config::nvhttp.file_state + ".backup";
+      try {
+        fs::copy_file(config::nvhttp.file_state, backup_path, fs::copy_options::overwrite_existing);
+      } catch (...) {
+        BOOST_LOG(warning) << "Failed to backup state file";
+      }
+    }
+
     pt::ptree root;
 
     if (fs::exists(config::nvhttp.file_state)) {
@@ -201,6 +211,18 @@ namespace nvhttp {
     } catch (std::exception &e) {
       BOOST_LOG(error) << "Couldn't write "sv << config::nvhttp.file_state << ": "sv << e.what();
       return;
+    }
+  }
+
+  bool validate_state_file() {
+    if (!fs::exists(config::nvhttp.file_state)) return false;
+
+    try {
+      pt::ptree tree;
+      pt::read_json(config::nvhttp.file_state, tree);
+      return tree.get_optional<std::string>("root.uniqueid").has_value();
+    } catch (...) {
+      return false;
     }
   }
 
@@ -279,6 +301,7 @@ namespace nvhttp {
 
     if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
       save_state();
+      load_state();  // Ensure cert_chain matches disk
     }
   }
 
@@ -1072,7 +1095,9 @@ namespace nvhttp {
 
     bool clean_slate = config::sunshine.flags[config::flag::FRESH_STATE];
 
-    if (!clean_slate) {
+    // ALWAYS try to load state if file exists
+    // FRESH_STATE should only prevent SAVING, not loading
+    if (fs::exists(config::nvhttp.file_state)) {
       load_state();
     }
 
