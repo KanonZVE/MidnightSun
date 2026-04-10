@@ -62,25 +62,23 @@ jobs:
             glslang-tools \
             npm \
             python3-jinja2 \
-            python3-setuptools \
-            2>&1 | tail -20
+            python3-setuptools
 
       - name: Show system info
         run: |
           echo "=== System Info ==="
           uname -a
           echo "=== CMake Version ==="
-          cmake --version
+          cmake --version | head -1
           echo "=== Ninja Version ==="
           ninja --version
           echo "=== GCC Version ==="
           gcc --version | head -1
           echo "=== Disk Space ==="
-          df -h
+          df -h .
 
       - name: Configure CMake with AppImage flag
         run: |
-          echo "=== CMake Configure ==="
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
@@ -90,59 +88,57 @@ jobs:
             -DSUNSHINE_ENABLE_DRM=ON \
             -DSUNSHINE_ENABLE_PORTAL=ON \
             -DSUNSHINE_ENABLE_WAYLAND=ON \
-            -DSUNSHINE_ENABLE_X11=ON \
-            -DCMAKE_VERBOSE_MAKEFILE=ON \
-            2>&1 | tail -50
+            -DSUNSHINE_ENABLE_X11=ON
 
       - name: Build
-        run: |
-          echo "=== Build Start ==="
-          ninja -C build 2>&1 | tail -100
-          echo "=== Build End ==="
+        run: ninja -C build
 
       - name: Install to AppDir
         run: |
-          echo "=== Install Start ==="
           cd build
-          DESTDIR=AppDir ninja install 2>&1 | tail -50
-          echo "=== Install End ==="
+          mkdir -p AppDir
+          DESTDIR=$(pwd)/AppDir ninja install
+
+      - name: Verify AppDir structure
+        run: |
+          echo "=== AppDir Contents ==="
+          ls -la build/AppDir/
+          echo "=== AppDir/usr Contents ==="
+          ls -la build/AppDir/usr/ 2>/dev/null || echo "usr/ not found"
+          echo "=== AppDir/usr/bin Contents ==="
+          ls -la build/AppDir/usr/bin/ 2>/dev/null || echo "usr/bin/ not found"
+          echo "=== AppDir/usr/share Contents ==="
+          ls -la build/AppDir/usr/share/ 2>/dev/null || echo "usr/share/ not found"
 
       - name: Copy custom AppRun
         run: |
-          echo "=== Copy AppRun ==="
           cp -f packaging/AppImage/AppRun build/AppDir/
           chmod +x build/AppDir/AppRun
-          ls -la build/AppDir/
+          ls -la build/AppDir/AppRun
 
       - name: Download linuxdeploy
         run: |
-          echo "=== Download linuxdeploy ==="
           cd build
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
           wget -q https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
           chmod +x linuxdeploy-plugin-gtk.sh
-          ls -la *.AppImage *.sh
 
       - name: Create AppImage
         env:
           DEPLOY_GTK_VERSION: 3
         run: |
-          echo "=== Create AppImage ==="
           cd build
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin gtk \
             --executable AppDir/usr/bin/sunshine \
             --desktop-file ../packaging/AppImage/com.midnightsun.app.desktop \
-            --output appimage \
-            2>&1 | tail -100
+            --output appimage
 
       - name: Rename AppImage
         run: |
-          echo "=== Rename AppImage ==="
           cd build
-          find . -name "*.AppImage" -type f
           find . -name "*.AppImage" -type f -exec mv {} ../MidnightSun-x86_64.AppImage \;
           chmod +x ../MidnightSun-x86_64.AppImage
 
@@ -155,24 +151,24 @@ jobs:
 
       - name: Show AppImage info
         run: |
-          echo "=== AppImage Info ==="
           if [ -f MidnightSun-x86_64.AppImage ]; then
+            echo "=== AppImage Created Successfully ==="
             ls -lh MidnightSun-x86_64.AppImage
             file MidnightSun-x86_64.AppImage
           else
-            echo "AppImage not found"
+            echo "ERROR: AppImage not found"
             ls -la
           fi
 
       - name: Show build logs on failure
         if: failure()
         run: |
-          echo "=== Build Failed - Showing Logs ==="
-          echo "=== CMake Cache ==="
-          cat build/CMakeCache.txt | grep -E "SUNSHINE|CMAKE" | head -30
-          echo "=== CMake Output ==="
-          cat build/CMakeFiles/CMakeOutput.log 2>/dev/null || echo "No CMakeOutput.log"
-          echo "=== Last 100 lines of build log ==="
-          cat build/build.ninja 2>/dev/null | tail -100 || echo "No build.ninja"
-          echo "=== AppDir contents ==="
-          ls -laR build/AppDir/ 2>/dev/null | head -50
+          echo "=== Build Failed - Diagnostic Info ==="
+          echo "=== CMake Cache (relevant) ==="
+          grep -E "SUNSHINE|CMAKE_INSTALL_PREFIX|SUNSHINE_ASSETS" build/CMakeCache.txt 2>/dev/null | head -20
+          echo "=== Build directory structure ==="
+          ls -la build/
+          echo "=== AppDir structure ==="
+          ls -laR build/AppDir/ 2>/dev/null | head -100
+          echo "=== Last 50 lines of build output ==="
+          tail -50 build/build.ninja 2>/dev/null || echo "No build.ninja"
