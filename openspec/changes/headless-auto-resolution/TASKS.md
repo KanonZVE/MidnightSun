@@ -105,6 +105,22 @@
 - [ ] Tested on Steam Deck (Gamescope environment)
 **Estimated**: 1 day
 
+### Task 3.4: Certificate Persistence ✅ COMPLETED
+**Description**: Fix certificate loss when sessions closed/reopened
+**Files**: `src/nvhttp.cpp`
+**Acceptance Criteria**:
+- [x] Certificates persist across server restarts
+- [x] No re-pairing needed after session close/open
+- [x] State file backup prevents data loss
+- [x] Validation detects corrupted state files
+- [x] No regression in existing functionality
+**Implementation**:
+- Fix 1: Always load state if file exists (regardless of FRESH_STATE)
+- Fix 2: Reload after save for memory/disk consistency
+- Fix 3: State file validation (validate_state_file())
+- Fix 4: Backup before save (.backup file)
+**Estimated**: 1 day
+
 ---
 
 ## PHASE 4: TESTING & POLISH (Week 4-5)
