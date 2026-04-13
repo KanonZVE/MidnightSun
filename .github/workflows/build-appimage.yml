@@ -72,12 +72,7 @@ jobs:
           # Clone doxyconfig
           git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
           
-          # Clone wayland-protocols
-          git clone --depth 1 https://gitlab.freedesktop.org/wayland/wayland-protocols.git third-party/wayland-protocols
-          
-          # Clone wlr-protocols
-          git clone --depth 1 https://gitlab.freedesktop.org/wayland/wlr-protocols.git third-party/wlr-protocols
-          
+
           # Clone tray
           git clone --depth 1 https://github.com/nicknaccess/tray.git third-party/tray
           
@@ -104,6 +99,7 @@ jobs:
             libdrm-dev \
             libgl-dev \
             libwayland-dev \
+            wayland-protocols \
             libx11-xcb-dev \
             libxcb-dri3-dev \
             libxfixes-dev \
