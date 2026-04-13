@@ -74,10 +74,16 @@ jobs:
           # Clone doxyconfig
           git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
           
-          # Create symlink for wayland-protocols from system packages
-          echo "=== Creating symlink for wayland-protocols ==="
-          mkdir -p third-party/wayland-protocols
-          ln -s /usr/share/wayland-protocols/* third-party/wayland-protocols/
+          # Copy wayland-protocols from system packages
+          echo "=== Copying wayland-protocols from system ==="
+          rm -rf third-party/wayland-protocols
+          cp -r /usr/share/wayland-protocols third-party/wayland-protocols
+          
+          # Verify the copy worked
+          echo "=== Verifying wayland-protocols structure ==="
+          ls -la third-party/wayland-protocols/
+          echo "=== Checking for xdg-output-unstable-v1.xml ==="
+          find third-party/wayland-protocols -name "xdg-output-unstable-v1.xml" 2>/dev/null || echo "Not found"
           
           # Create empty wlr-protocols directory (may not be needed)
           mkdir -p third-party/wlr-protocols
