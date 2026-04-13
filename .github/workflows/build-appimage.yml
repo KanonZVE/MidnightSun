@@ -38,6 +38,8 @@ jobs:
           rm -rf third-party/googletest
           rm -rf third-party/build-deps
           rm -rf third-party/doxyconfig
+          rm -rf third-party/wayland-protocols
+          rm -rf third-party/wlr-protocols
           
           # Clone glad
           git clone --depth 1 https://github.com/Dav1dde/glad.git third-party/glad
@@ -71,6 +73,14 @@ jobs:
           
           # Clone doxyconfig
           git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
+          
+          # Create symlink for wayland-protocols from system packages
+          echo "=== Creating symlink for wayland-protocols ==="
+          mkdir -p third-party/wayland-protocols
+          ln -s /usr/share/wayland-protocols/* third-party/wayland-protocols/
+          
+          # Create empty wlr-protocols directory (may not be needed)
+          mkdir -p third-party/wlr-protocols
           
           echo "=== Verifying cloned directories ==="
           ls -la third-party/
