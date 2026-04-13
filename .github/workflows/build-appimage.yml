@@ -72,16 +72,6 @@ jobs:
           # Clone doxyconfig
           git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
           
-
-          # Clone tray
-          git clone --depth 1 https://github.com/nicknaccess/tray.git third-party/tray
-          
-          # Clone TPCircularBuffer
-          git clone --depth 1 https://github.com/nicknaccess/TPCircularBuffer.git third-party/TPircularBuffer
-          
-          # Clone ViGEmClient
-          git clone --depth 1 https://github.com/nicknaccess/ViGEmClient.git third-party/ViGEmClient
-          
           echo "=== Verifying cloned directories ==="
           ls -la third-party/
           echo "=== Checking glad/cmake ==="
