@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "=== Cloning required submodules manually ==="
           
-          # Remove empty directories if they exist
+          # Remove empty directories if they exist (but keep wlr-protocols with our XML file)
           rm -rf third-party/glad
           rm -rf third-party/moonlight-common-c
           rm -rf third-party/Simple-Web-Server
@@ -39,7 +39,7 @@ jobs:
           rm -rf third-party/build-deps
           rm -rf third-party/doxyconfig
           rm -rf third-party/wayland-protocols
-          rm -rf third-party/wlr-protocols
+          # Note: wlr-protocols is NOT deleted - it contains our XML file
           
           # Clone glad
           git clone --depth 1 https://github.com/Dav1dde/glad.git third-party/glad
