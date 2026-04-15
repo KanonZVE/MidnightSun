@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="wlr_screencopy_unstable_v1">
+  <copyright>
+    Copyright © 2018 Drew DeVault
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <description summary="screen capture protocol">
+    This protocol allows clients to ask the compositor to copy part of the
+    screen content to a client-provided buffer.
+
+    Warning! The protocol described in this file is experimental and
+    backward incompatible changes may be made. Backward compatible changes
+    may be added together with the corresponding interface version bump.
+    Backward incompatible changes are done by bumping the version number in
+    the protocol and interface names and resetting the interface version.
+    Once the protocol is to be declared stable, the 'z' prefix and the
+    version number in the protocol and interface names are removed and the
+    interface version number is reset.
+  </description>
+
+  <interface name="zwlr_screencopy_manager_v1" version="3">
+    <description summary="manager to inform clients and begin capturing">
+      This object is a manager which offers requests to start capturing from a
+      source.
+    </description>
+
+    <request name="capture_output">
+      <description summary="capture an output">
+        Capture the next frame of an entire output.
+
+        When the compositor considers the new frame ready, the
+        zwlr_screencopy_frame_v1.buffer_done event is sent.
+      </description>
+      <arg name="id" type="new_id" interface="zwlr_screencopy_frame_v1"/>
+      <arg name="overlay_cursor" type="int"/>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+
+    <request name="capture_output_region">
+      <description summary="capture an output's region">
+        Capture the next frame of a region of an output.
+
+        The region is given in output-local coordinates.
+
+        When the compositor considers the new frame ready, the
+        zwlr_screencopy_frame_v1.buffer_done event is sent.
+      </description>
+      <arg name="id" type="new_id" interface="zwlr_screencopy_frame_v1"/>
+      <arg name="overlay_cursor" type="int"/>
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the manager">
+        Destroys the manager. This request has no side-effect.
+      </description>
+    </request>
+  </interface>
+
+  <enum name="zwlr_screencopy_frame_v1_error">
+    <entry name="invalid_buffer" value="0" summary="the provided buffer has an invalid format"/>
+  </enum>
+
+  <interface name="zwlr_screencopy_frame_v1" version="3">
+    <description summary="a frame ready for copy">
+      This object represents a single frame.
+
+      When created, a "buffer_done" event will be sent. The client should then
+      create a buffer, and send the "copy" request.
+
+      After the "ready" event is sent, the client should destroy the frame.
+    </description>
+
+    <event name="buffer">
+      <description summary="buffer information">
+        Provides information about the buffer parameters for the frame.
+      </description>
+      <arg name="format" type="uint" summary="buffer format"/>
+      <arg name="width" type="uint" summary="buffer width"/>
+      <arg name="height" type="uint" summary="buffer height"/>
+      <arg name="stride" type="uint" summary="buffer stride"/>
+    </event>
+
+    <event name="flags" since="3">
+      <description summary="frame flags">
+        Provides flags about the frame.
+      </description>
+      <arg name="flags" type="uint" summary="frame flags"/>
+    </event>
+
+    <event name="ready">
+      <description summary="indicates frame is available for reading">
+        Called as soon as the frame is copied, indicating the buffer is
+        ready to be read by the client.
+      </description>
+      <arg name="tv_sec_hi" type="uint" summary="high 32 bits of the seconds part of the timestamp"/>
+      <arg name="tv_sec_lo" type="uint" summary="low 32 bits of the seconds part of the timestamp"/>
+      <arg name="tv_nsec" type="uint" summary="nanoseconds part of the timestamp"/>
+    </event>
+
+    <event name="failed">
+      <description summary="frame copy failed">
+        This event indicates that the attempted copy has failed.
+      </description>
+    </event>
+
+    <event name="damage">
+      <description summary="carries buffer damage">
+        This event is sent right before the ready event when the compositor
+        has not sent a buffer event since the last copy request.
+
+        The arguments describe the damaged region of the buffer, in buffer-local
+        coordinates.
+      </description>
+      <arg name="x" type="uint"/>
+      <arg name="y" type="uint"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+    </event>
+
+    <event name="linux_dmabuf">
+      <description summary="linux_dmabuf buffer information">
+        Provides information about the linux_dmabuf buffer parameters for the frame.
+      </description>
+      <arg name="format" type="uint" summary="fourcc drm format"/>
+      <arg name="width" type="uint" summary="buffer width"/>
+      <arg name="height" type="uint" summary="buffer height"/>
+    </event>
+
+    <event name="buffer_done" since="2">
+      <description summary="all buffer attributes have been sent">
+        This event is sent once after all buffer attributes have been sent.
+        The client should proceed to create a buffer and send the copy request.
+      </description>
+    </event>
+
+    <request name="copy">
+      <description summary="copy the frame">
+        Copy the frame to the supplied buffer. The buffer must have the
+        correct size and format as provided by the buffer event.
+
+        If the frame is successfully copied, a "ready" event is sent.
+        Otherwise, a "failed" event is sent.
+      </description>
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+    </request>
+
+    <request name="copy_with_damage">
+      <description summary="copy the frame with damage">
+        Same as copy, except it also provides information about the changed
+        region.
+
+        After this request is sent, the compositor will send a "damage"
+        event before the "ready" event if it knows the damaged region.
+      </description>
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the frame">
+        Destroys the frame. This request can be sent at any time by the
+        client.
+      </description>
+    </request>
+  </interface>
+</protocol>

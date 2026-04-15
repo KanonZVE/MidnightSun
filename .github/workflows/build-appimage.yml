@@ -153,8 +153,10 @@ jobs:
           echo "=== Checking for xdg-output-unstable-v1.xml ==="
           find third-party/wayland-protocols -name "xdg-output-unstable-v1.xml" 2>/dev/null || echo "Not found"
           
-          # Create empty wlr-protocols directory (may not be needed)
-          mkdir -p third-party/wlr-protocols
+          # Copy wlr-screencopy-unstable-v1.xml from local file
+          echo "=== Copying wlr-protocols ==="
+          mkdir -p third-party/wlr-protocols/unstable
+          cp third-party/wlr-protocols/unstable/wlr-screencopy-unstable-v1.xml third-party/wlr-protocols/unstable/
 
       - name: Show system info
         run: |
