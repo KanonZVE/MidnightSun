@@ -74,20 +74,6 @@ jobs:
           # Clone doxyconfig
           git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
           
-          # Copy wayland-protocols from system packages
-          echo "=== Copying wayland-protocols from system ==="
-          rm -rf third-party/wayland-protocols
-          cp -r /usr/share/wayland-protocols third-party/wayland-protocols
-          
-          # Verify the copy worked
-          echo "=== Verifying wayland-protocols structure ==="
-          ls -la third-party/wayland-protocols/
-          echo "=== Checking for xdg-output-unstable-v1.xml ==="
-          find third-party/wayland-protocols -name "xdg-output-unstable-v1.xml" 2>/dev/null || echo "Not found"
-          
-          # Create empty wlr-protocols directory (may not be needed)
-          mkdir -p third-party/wlr-protocols
-          
           echo "=== Verifying cloned directories ==="
           ls -la third-party/
           echo "=== Checking glad/cmake ==="
@@ -137,6 +123,38 @@ jobs:
             npm \
             python3-jinja2 \
             python3-setuptools
+
+      - name: Copy wayland-protocols from system
+        run: |
+          echo "=== Copying wayland-protocols from system ==="
+          # Find where wayland-protocols is installed
+          WAYLAND_PROTOCOLS_DIR=$(dpkg -L wayland-protocols | grep -E "/stable/|/unstable/" | head -1 | sed 's|/stable/.*||;s|/unstable/.*||')
+          echo "=== Base directory: $WAYLAND_PROTOCOLS_DIR ==="
+          
+          # Copy to third-party
+          rm -rf third-party/wayland-protocols
+          if [ -n "$WAYLAND_PROTOCOLS_DIR" ]; then
+            cp -r "$WAYLAND_PROTOCOLS_DIR" third-party/wayland-protocols
+          else
+            # Fallback: try common locations
+            if [ -d "/usr/share/wayland-protocols" ]; then
+              cp -r /usr/share/wayland-protocols third-party/wayland-protocols
+            elif [ -d "/usr/local/share/wayland-protocols" ]; then
+              cp -r /usr/local/share/wayland-protocols third-party/wayland-protocols
+            else
+              echo "ERROR: Could not find wayland-protocols directory"
+              exit 1
+            fi
+          fi
+          
+          # Verify the copy worked
+          echo "=== Verifying wayland-protocols structure ==="
+          ls -la third-party/wayland-protocols/
+          echo "=== Checking for xdg-output-unstable-v1.xml ==="
+          find third-party/wayland-protocols -name "xdg-output-unstable-v1.xml" 2>/dev/null || echo "Not found"
+          
+          # Create empty wlr-protocols directory (may not be needed)
+          mkdir -p third-party/wlr-protocols
 
       - name: Show system info
         run: |
