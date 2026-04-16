@@ -71,8 +71,8 @@ jobs:
           # Clone build-deps (recursive to get nested submodules)
           git clone --recursive https://github.com/LizardByte/build-deps.git third-party/build-deps
           
-          # Clone doxyconfig
-          git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
+          # Skip doxyconfig - not needed for AppImage (documentation only)
+          # git clone --depth 1 https://github.com/LizardByte/doxyconfig.git third-party/doxyconfig
           
           echo "=== Verifying cloned directories ==="
           ls -la third-party/
