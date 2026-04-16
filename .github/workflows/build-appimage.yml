@@ -44,8 +44,8 @@ jobs:
           # Clone glad
           git clone --depth 1 https://github.com/Dav1dde/glad.git third-party/glad
           
-          # Clone moonlight-common-c
-          git clone --depth 1 https://github.com/moonlight-stream/moonlight-common-c.git third-party/moonlight-common-c
+          # Clone moonlight-common-c (recursive to get enet submodule)
+          git clone --recursive https://github.com/moonlight-stream/moonlight-common-c.git third-party/moonlight-common-c
           
           # Clone Simple-Web-Server
           git clone --depth 1 https://github.com/LizardByte-infrastructure/Simple-Web-Server.git third-party/Simple-Web-Server
