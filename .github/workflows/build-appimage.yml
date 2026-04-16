@@ -178,6 +178,7 @@ jobs:
             -DSUNSHINE_BUILD_APPIMAGE=ON \
             -DCUDA_FAIL_ON_MISSING=OFF \
             -DBUILD_DOCS=OFF \
+            -DBUILD_TESTS=OFF \
             -DSUNSHINE_ENABLE_DRM=ON \
             -DSUNSHINE_ENABLE_PORTAL=ON \
             -DSUNSHINE_ENABLE_WAYLAND=ON \
